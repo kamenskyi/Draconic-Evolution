@@ -1,9 +1,5 @@
 package com.brandon3055.draconicevolution.integration.computers;
 
-import li.cil.oc.api.Driver;
-import li.cil.oc.api.network.ManagedEnvironment;
-import li.cil.oc.api.prefab.DriverTileEntity;
-
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 
@@ -15,6 +11,9 @@ import cpw.mods.fml.common.Optional;
 import dan200.computercraft.api.ComputerCraftAPI;
 import dan200.computercraft.api.peripheral.IPeripheral;
 import dan200.computercraft.api.peripheral.IPeripheralProvider;
+import li.cil.oc.api.Driver;
+import li.cil.oc.api.network.ManagedEnvironment;
+import li.cil.oc.api.prefab.DriverTileEntity;
 
 /**
  * Created by brandon3055 on 21/9/2015.

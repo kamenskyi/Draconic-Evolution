@@ -6,6 +6,7 @@ import net.minecraftforge.common.config.Configuration;
 
 import com.brandon3055.draconicevolution.common.handler.ConfigHandler;
 import com.brandon3055.draconicevolution.common.lib.References;
+
 import cpw.mods.fml.client.config.GuiConfig;
 
 /**

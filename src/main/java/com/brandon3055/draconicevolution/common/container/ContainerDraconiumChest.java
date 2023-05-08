@@ -9,14 +9,13 @@ import net.minecraft.item.crafting.FurnaceRecipes;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
-import cofh.api.energy.IEnergyContainerItem;
-
 import com.brandon3055.draconicevolution.common.blocks.DraconiumChest;
 import com.brandon3055.draconicevolution.common.inventory.InventoryCraftingChest;
 import com.brandon3055.draconicevolution.common.inventory.InventoryCraftingChestResult;
 import com.brandon3055.draconicevolution.common.lib.OreDoublingRegistry;
 import com.brandon3055.draconicevolution.common.tileentities.TileDraconiumChest;
 
+import cofh.api.energy.IEnergyContainerItem;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import invtweaks.api.container.ChestContainer;

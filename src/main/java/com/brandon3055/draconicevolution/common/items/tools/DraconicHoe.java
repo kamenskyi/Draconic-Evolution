@@ -22,8 +22,6 @@ import net.minecraftforge.event.entity.player.UseHoeEvent;
 
 import org.lwjgl.opengl.GL11;
 
-import cofh.api.energy.IEnergyContainerItem;
-
 import com.brandon3055.brandonscore.common.utills.InfoHelper;
 import com.brandon3055.brandonscore.common.utills.ItemNBTHelper;
 import com.brandon3055.brandonscore.common.utills.Utills;
@@ -37,6 +35,7 @@ import com.brandon3055.draconicevolution.common.lib.References;
 import com.brandon3055.draconicevolution.common.lib.Strings;
 import com.brandon3055.draconicevolution.common.utills.*;
 
+import cofh.api.energy.IEnergyContainerItem;
 import cpw.mods.fml.common.eventhandler.Event.Result;
 import cpw.mods.fml.common.registry.GameRegistry;
 import cpw.mods.fml.relauncher.Side;

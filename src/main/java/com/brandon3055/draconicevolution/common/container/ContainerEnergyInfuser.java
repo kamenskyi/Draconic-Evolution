@@ -5,11 +5,10 @@ import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 
-import cofh.api.energy.IEnergyContainerItem;
-
 import com.brandon3055.draconicevolution.common.inventory.SlotChargable;
 import com.brandon3055.draconicevolution.common.tileentities.TileEnergyInfuser;
 
+import cofh.api.energy.IEnergyContainerItem;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 

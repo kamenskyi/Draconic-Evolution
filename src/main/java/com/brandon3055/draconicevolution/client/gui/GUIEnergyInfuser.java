@@ -14,13 +14,12 @@ import net.minecraft.util.StatCollector;
 
 import org.lwjgl.opengl.GL11;
 
-import cofh.api.energy.IEnergyContainerItem;
-
 import com.brandon3055.brandonscore.client.utills.GuiHelper;
 import com.brandon3055.draconicevolution.common.container.ContainerEnergyInfuser;
 import com.brandon3055.draconicevolution.common.lib.References;
 import com.brandon3055.draconicevolution.common.tileentities.TileEnergyInfuser;
 
+import cofh.api.energy.IEnergyContainerItem;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 

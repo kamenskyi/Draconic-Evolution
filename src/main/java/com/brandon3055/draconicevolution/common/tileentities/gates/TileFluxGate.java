@@ -3,10 +3,10 @@ package com.brandon3055.draconicevolution.common.tileentities.gates;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraftforge.common.util.ForgeDirection;
 
-import cofh.api.energy.IEnergyReceiver;
-
 import com.brandon3055.brandonscore.common.utills.Utills;
 import com.brandon3055.draconicevolution.common.lib.References;
+
+import cofh.api.energy.IEnergyReceiver;
 
 /**
  * Created by Brandon on 29/6/2015.

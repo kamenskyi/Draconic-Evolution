@@ -9,6 +9,7 @@ import net.minecraft.world.IBlockAccess;
 
 import com.brandon3055.draconicevolution.common.ModBlocks;
 import com.brandon3055.draconicevolution.common.lib.References;
+
 import cpw.mods.fml.client.registry.ISimpleBlockRenderingHandler;
 
 /**

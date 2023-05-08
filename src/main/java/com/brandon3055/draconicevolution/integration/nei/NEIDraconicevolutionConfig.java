@@ -2,14 +2,14 @@ package com.brandon3055.draconicevolution.integration.nei;
 
 import net.minecraft.item.ItemStack;
 
-import codechicken.nei.api.API;
-import codechicken.nei.api.IConfigureNEI;
-
 import com.brandon3055.draconicevolution.client.gui.GUIDraconiumChest;
 import com.brandon3055.draconicevolution.common.ModBlocks;
 import com.brandon3055.draconicevolution.common.ModItems;
 import com.brandon3055.draconicevolution.common.lib.References;
 import com.brandon3055.draconicevolution.common.utills.LogHelper;
+
+import codechicken.nei.api.API;
+import codechicken.nei.api.IConfigureNEI;
 
 /**
  * Created by Brandon on 30/10/2014.

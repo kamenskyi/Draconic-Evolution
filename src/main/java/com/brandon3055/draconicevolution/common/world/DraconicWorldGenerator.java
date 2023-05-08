@@ -10,6 +10,7 @@ import net.minecraft.world.gen.feature.WorldGenMinable;
 
 import com.brandon3055.draconicevolution.common.ModBlocks;
 import com.brandon3055.draconicevolution.common.handler.ConfigHandler;
+
 import cpw.mods.fml.common.IWorldGenerator;
 
 public class DraconicWorldGenerator implements IWorldGenerator {

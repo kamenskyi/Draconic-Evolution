@@ -16,9 +16,6 @@ import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.StatCollector;
 import net.minecraftforge.common.util.ForgeDirection;
 
-import cofh.api.energy.IEnergyContainerItem;
-import cofh.api.energy.IEnergyReceiver;
-
 import com.brandon3055.brandonscore.common.utills.InventoryUtils;
 import com.brandon3055.draconicevolution.common.ModBlocks;
 import com.brandon3055.draconicevolution.common.blocks.DraconiumChest;
@@ -26,6 +23,9 @@ import com.brandon3055.draconicevolution.common.container.ContainerDraconiumChes
 import com.brandon3055.draconicevolution.common.lib.OreDoublingRegistry;
 import com.brandon3055.draconicevolution.common.utills.EnergyStorage;
 import com.brandon3055.draconicevolution.common.utills.ICustomItemData;
+
+import cofh.api.energy.IEnergyContainerItem;
+import cofh.api.energy.IEnergyReceiver;
 
 /**
  * Created by Brandon on 27/06/2014.

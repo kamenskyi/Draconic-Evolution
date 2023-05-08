@@ -1,12 +1,12 @@
 package com.brandon3055.draconicevolution.integration.computers.oc;
 
+import com.brandon3055.draconicevolution.integration.computers.IDEPeripheral;
+
 import li.cil.oc.api.driver.NamedBlock;
 import li.cil.oc.api.machine.Arguments;
 import li.cil.oc.api.machine.Context;
 import li.cil.oc.api.network.ManagedPeripheral;
 import li.cil.oc.api.prefab.ManagedEnvironment;
-
-import com.brandon3055.draconicevolution.integration.computers.IDEPeripheral;
 
 /**
  * Created by brandon3055 on 22/9/2015.

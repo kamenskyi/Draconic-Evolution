@@ -14,14 +14,14 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.ArrowLooseEvent;
 import net.minecraftforge.event.entity.player.ArrowNockEvent;
 
-import cofh.api.energy.IEnergyContainerItem;
-
 import com.brandon3055.draconicevolution.common.ModItems;
 import com.brandon3055.draconicevolution.common.entity.EntityCustomArrow;
 import com.brandon3055.draconicevolution.common.entity.EntityEnderArrow;
 import com.brandon3055.draconicevolution.common.handler.BalanceConfigHandler;
 import com.brandon3055.draconicevolution.common.utills.IConfigurableItem;
 import com.brandon3055.draconicevolution.common.utills.IUpgradableItem;
+
+import cofh.api.energy.IEnergyContainerItem;
 
 public class BowHandler {
 

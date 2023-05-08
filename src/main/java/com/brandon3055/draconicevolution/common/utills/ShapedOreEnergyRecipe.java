@@ -6,9 +6,9 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.oredict.ShapedOreRecipe;
 
-import cofh.api.energy.IEnergyContainerItem;
-
 import com.brandon3055.brandonscore.common.utills.ItemNBTHelper;
+
+import cofh.api.energy.IEnergyContainerItem;
 
 /**
  * Created by Brandon on 8/12/2014.

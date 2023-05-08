@@ -10,6 +10,7 @@ import net.minecraftforge.common.config.Property;
 
 import com.brandon3055.draconicevolution.common.ModBlocks;
 import com.brandon3055.draconicevolution.common.utills.IUpgradableItem.EnumUpgrade;
+
 import cpw.mods.fml.common.registry.GameRegistry;
 
 public class BalanceConfigHandler {
