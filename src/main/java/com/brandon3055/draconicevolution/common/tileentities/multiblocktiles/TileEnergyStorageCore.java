@@ -1,13 +1,22 @@
 package com.brandon3055.draconicevolution.common.tileentities.multiblocktiles;
 
-import net.minecraft.init.Blocks;
+import java.util.ArrayList;
+import java.util.List;
+
+import net.minecraft.block.Block;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.NetworkManager;
 import net.minecraft.network.Packet;
 import net.minecraft.network.play.server.S35PacketUpdateTileEntity;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.AxisAlignedBB;
+import net.minecraft.util.StatCollector;
+import net.minecraftforge.common.util.ForgeDirection;
 
+import com.brandon3055.brandonscore.common.utills.InfoHelper;
+import com.brandon3055.brandonscore.common.utills.Utills;
 import com.brandon3055.draconicevolution.common.ModBlocks;
+import com.brandon3055.draconicevolution.common.blocks.multiblock.InvisibleMultiblock;
 import com.brandon3055.draconicevolution.common.blocks.multiblock.MultiblockHelper.TileLocation;
 import com.brandon3055.draconicevolution.common.handler.BalanceConfigHandler;
 import com.brandon3055.draconicevolution.common.lib.References;
@@ -22,6 +31,14 @@ import cpw.mods.fml.common.network.NetworkRegistry;
  */
 public class TileEnergyStorageCore extends TileObjectSync {
 
+    public static final int STABILIZER_SEARCH_DISTANCE = 11;
+
+    @FunctionalInterface
+    private interface IBlockAction {
+
+        boolean process(int x, int y, int z);
+    }
+
     protected TileLocation[] stabilizers = new TileLocation[4];
     protected int tier = 0;
     protected boolean online = false;
@@ -29,7 +46,6 @@ public class TileEnergyStorageCore extends TileObjectSync {
     private long energy = 0;
     private long capacity = 0;
     private long lastTickCapacity = 0;
-    private int tick = 0;
 
     public TileEnergyStorageCore() {
         for (int i = 0; i < stabilizers.length; i++) {
@@ -39,57 +55,51 @@ public class TileEnergyStorageCore extends TileObjectSync {
 
     @Override
     public void updateEntity() {
-        // energy = 200000000;
-        if (!online) return;
-        if (worldObj.isRemote) modelRotation += 0.5;
-        if (!worldObj.isRemote) detectAndRendChanges();
-        tick++;
+        if (!online) {
+            return;
+        }
+        if (worldObj.isRemote) {
+            modelRotation += 0.5;
+            return;
+        }
+        detectAndSendChanges();
     }
 
     /**
      * ######################MultiBlock Methods#######################
      */
-    public boolean tryActivate() {
-        if (!findStabalyzers()) return false;
-        if (!setTier(false)) return false;
-        if (!testOrActivateStructureIfValid(false, false)) return false;
-        online = true;
-        if (!testOrActivateStructureIfValid(false, true)) {
-            online = false;
-            deactivateStabilizers();
+    public boolean tryActivate(boolean isCreativeMode) {
+        if (!findStabilizers()) {
             return false;
         }
-        activateStabilizers();
-        worldObj.markBlockForUpdate(xCoord, yCoord, zCoord);
-        return true;
-    }
-
-    public boolean creativeActivate() {
-        if (!findStabalyzers()) return false;
-        if (!setTier(false)) return false;
-        if (!testOrActivateStructureIfValid(true, false)) return false;
-        online = true;
-        if (!testOrActivateStructureIfValid(false, true)) {
-            online = false;
-            deactivateStabilizers();
+        if (!setTier()) {
             return false;
         }
-        activateStabilizers();
-        worldObj.markBlockForUpdate(xCoord, yCoord, zCoord);
-        return true;
+
+        online = false;
+        boolean isStructureValid = isCreativeMode ? scanStructure(this::setInnerBlock, this::setOuterBlock)
+                : scanStructure(this::isInnerBlock, this::isOuterBlock);
+        if (isStructureValid) {
+            if (scanStructure(this::activateInnerBlock, this::activateOuterBlock)) {
+                online = true;
+                activateStabilizers();
+                worldObj.markBlockForUpdate(xCoord, yCoord, zCoord);
+                return true;
+            }
+            deactivateStabilizers();
+        }
+        return false;
     }
 
-    public boolean isStructureStillValid(boolean update) {
-        if (!checkStabilizers()) online = false;
-        if (!testOrActivateStructureIfValid(false, false)) online = false;
-        if (!areStabilizersActive()) online = false;
+    public void validateStructure(boolean update) {
+        online = areStabilizersActive() && scanStructure(this::isInnerBlock, this::isOuterBlock);
         worldObj.markBlockForUpdate(xCoord, yCoord, zCoord);
-        if (!online) deactivateStabilizers();
-        if (update && !online) reIntegrate();
-        // if (update && !online && worldObj.getTileEntity(xCoord, yCoord + 1, zCoord) != null &&
-        // worldObj.getTileEntity(xCoord, yCoord + 1, zCoord) instanceof TileInvisibleMultiblock)
-        // ((TileInvisibleMultiblock)worldObj.getTileEntity(xCoord, yCoord + 1, zCoord)).isStructureStillValid();
-        return online;
+        if (!online) {
+            deactivateStabilizers();
+            if (update) {
+                reIntegrate();
+            }
+        }
     }
 
     private void reIntegrate() {
@@ -97,597 +107,247 @@ public class TileEnergyStorageCore extends TileObjectSync {
             for (int y = yCoord - 1; y <= yCoord + 1; y++) {
                 for (int z = zCoord - 1; z <= zCoord + 1; z++) {
                     if (worldObj.getBlock(x, y, z) == ModBlocks.invisibleMultiblock) {
-                        if (worldObj.getBlockMetadata(x, y, z) == 0) {
-                            worldObj.setBlock(
-                                    x,
-                                    y,
-                                    z,
-                                    BalanceConfigHandler.energyStorageStructureOuterBlock,
-                                    BalanceConfigHandler.energyStorageStructureOuterBlockMetadata,
-                                    3);
-                        } else if (worldObj.getBlockMetadata(x, y, z) == 1) {
-                            worldObj.setBlock(
-                                    x,
-                                    y,
-                                    z,
-                                    BalanceConfigHandler.energyStorageStructureBlock,
-                                    BalanceConfigHandler.energyStorageStructureBlockMetadata,
-                                    3);
-                        }
+                        InvisibleMultiblock.revertStructure(worldObj, x, y, z);
                     }
                 }
             }
         }
     }
 
-    private boolean findStabalyzers() {
-        boolean flag = true;
-        for (int x = xCoord; x <= xCoord + 11; x++) {
-            if (worldObj.getBlock(x, yCoord, zCoord) == ModBlocks.particleGenerator) {
-                if (worldObj.getBlockMetadata(x, yCoord, zCoord) == 1) {
-                    flag = false;
+    private boolean findStabilizers() {
+        final ForgeDirection[] horizontalDirections = new ForgeDirection[] { ForgeDirection.EAST, ForgeDirection.SOUTH,
+                ForgeDirection.WEST, ForgeDirection.NORTH };
+        int stabilizersCount = 0;
+        for (ForgeDirection direction : horizontalDirections) {
+            for (int distance = 1; distance <= STABILIZER_SEARCH_DISTANCE; distance++) {
+                int x = xCoord + direction.offsetX * distance;
+                int z = zCoord + direction.offsetZ * distance;
+                if (worldObj.getBlock(x, yCoord, z) == ModBlocks.particleGenerator) {
+                    if (worldObj.getBlockMetadata(x, yCoord, z) == 1) {
+                        return false;
+                    }
+                    stabilizers[stabilizersCount++] = new TileLocation(x, yCoord, z);
                     break;
                 }
-                stabilizers[0] = new TileLocation(x, yCoord, zCoord);
-                break;
-            } else if (x == xCoord + 11) {
-                flag = false;
             }
         }
-        for (int x = xCoord; x >= xCoord - 11; x--) {
-            if (worldObj.getBlock(x, yCoord, zCoord) == ModBlocks.particleGenerator) {
-                if (worldObj.getBlockMetadata(x, yCoord, zCoord) == 1) {
-                    flag = false;
-                    break;
-                }
-                stabilizers[1] = new TileLocation(x, yCoord, zCoord);
-                break;
-            } else if (x == xCoord - 11) {
-                flag = false;
-            }
-        }
-        for (int z = zCoord; z <= zCoord + 11; z++) {
-            if (worldObj.getBlock(xCoord, yCoord, z) == ModBlocks.particleGenerator) {
-                if (worldObj.getBlockMetadata(xCoord, yCoord, z) == 1) {
-                    flag = false;
-                    break;
-                }
-                stabilizers[2] = new TileLocation(xCoord, yCoord, z);
-                break;
-            } else if (z == zCoord + 11) {
-                flag = false;
-            }
-        }
-        for (int z = zCoord; z >= zCoord - 11; z--) {
-            if (worldObj.getBlock(xCoord, yCoord, z) == ModBlocks.particleGenerator) {
-                if (worldObj.getBlockMetadata(xCoord, yCoord, z) == 1) {
-                    flag = false;
-                    break;
-                }
-                stabilizers[3] = new TileLocation(xCoord, yCoord, z);
-                break;
-            } else if (z == zCoord - 11) {
-                flag = false;
-            }
-        }
-        return flag;
+        return stabilizersCount == 4;
     }
 
-    private boolean setTier(boolean force) {
-        if (force) return true;
-        int xPos = 0;
-        int xNeg = 0;
-        int yPos = 0;
-        int yNeg = 0;
-        int zPos = 0;
-        int zNeg = 0;
-        int range = 5;
+    private boolean setTier() {
+        final int range = 5;
 
-        for (int x = 0; x <= range; x++) {
-            if (testForOrActivateDraconium(xCoord + x, yCoord, zCoord, false, false)) {
-                xPos = x;
-                break;
+        int[] outerBlocksDistances = new int[6];
+        for (ForgeDirection direction : ForgeDirection.VALID_DIRECTIONS) {
+            for (int distance = 1; distance <= range; distance++) {
+                int x = xCoord + direction.offsetX * distance;
+                int y = yCoord + direction.offsetY * distance;
+                int z = zCoord + direction.offsetZ * distance;
+                if (isOuterBlock(x, y, z)) {
+                    outerBlocksDistances[direction.ordinal()] = distance;
+                    break;
+                }
+            }
+        }
+        for (int i = 1; i < outerBlocksDistances.length; i++) {
+            if (outerBlocksDistances[i] != outerBlocksDistances[0]) {
+                return false;
             }
         }
 
-        for (int x = 0; x <= range; x++) {
-            if (testForOrActivateDraconium(xCoord - x, yCoord, zCoord, false, false)) {
-                xNeg = x;
-                break;
-            }
+        tier = outerBlocksDistances[0];
+        if (tier > 1) {
+            tier++;
         }
-
-        for (int y = 0; y <= range; y++) {
-            if (testForOrActivateDraconium(xCoord, yCoord + y, zCoord, false, false)) {
-                yPos = y;
-                break;
-            }
-        }
-
-        for (int y = 0; y <= range; y++) {
-            if (testForOrActivateDraconium(xCoord, yCoord - y, zCoord, false, false)) {
-                yNeg = y;
-                break;
-            }
-        }
-
-        for (int z = 0; z <= range; z++) {
-            if (testForOrActivateDraconium(xCoord, yCoord, zCoord + z, false, false)) {
-                zPos = z;
-                break;
-            }
-        }
-
-        for (int z = 0; z <= range; z++) {
-            if (testForOrActivateDraconium(xCoord, yCoord, zCoord - z, false, false)) {
-                zNeg = z;
-                break;
-            }
-        }
-
-        if (zNeg != zPos || zNeg != yNeg || zNeg != yPos || zNeg != xNeg || zNeg != xPos) return false;
-
-        tier = xPos;
-        if (tier > 1) tier++;
         if (tier == 1) {
-            if (testForOrActivateDraconium(xCoord + 1, yCoord + 1, zCoord, false, false)) tier = 2;
-        }
-        return true;
-    }
-
-    private boolean testOrActivateStructureIfValid(boolean setBlocks, boolean activate) {
-        switch (tier) {
-            case 0:
-                if (!testOrActivateRect(1, 1, 1, "air", setBlocks, activate)) return false;
-                break;
-            case 1:
-                if (!testForOrActivateDraconium(xCoord + 1, yCoord, zCoord, setBlocks, activate)
-                        || !testForOrActivateDraconium(xCoord - 1, yCoord, zCoord, setBlocks, activate)
-                        || !testForOrActivateDraconium(xCoord, yCoord + 1, zCoord, setBlocks, activate)
-                        || !testForOrActivateDraconium(xCoord, yCoord - 1, zCoord, setBlocks, activate)
-                        || !testForOrActivateDraconium(xCoord, yCoord, zCoord + 1, setBlocks, activate)
-                        || !testForOrActivateDraconium(xCoord, yCoord, zCoord - 1, setBlocks, activate))
-                    return false;
-                if (!isReplacable(xCoord + 1, yCoord + 1, zCoord, setBlocks)
-                        || !isReplacable(xCoord, yCoord + 1, zCoord + 1, setBlocks)
-                        || !isReplacable(xCoord - 1, yCoord + 1, zCoord, setBlocks)
-                        || !isReplacable(xCoord, yCoord + 1, zCoord - 1, setBlocks)
-                        || !isReplacable(xCoord + 1, yCoord - 1, zCoord, setBlocks)
-                        || !isReplacable(xCoord, yCoord - 1, zCoord + 1, setBlocks)
-                        || !isReplacable(xCoord - 1, yCoord - 1, zCoord, setBlocks)
-                        || !isReplacable(xCoord, yCoord - 1, zCoord - 1, setBlocks)
-                        || !isReplacable(xCoord + 1, yCoord, zCoord + 1, setBlocks)
-                        || !isReplacable(xCoord - 1, yCoord, zCoord - 1, setBlocks)
-                        || !isReplacable(xCoord + 1, yCoord, zCoord - 1, setBlocks)
-                        || !isReplacable(xCoord - 1, yCoord, zCoord + 1, setBlocks))
-                    return false;
-                if (!isReplacable(xCoord + 1, yCoord + 1, zCoord + 1, setBlocks)
-                        || !isReplacable(xCoord - 1, yCoord + 1, zCoord - 1, setBlocks)
-                        || !isReplacable(xCoord + 1, yCoord + 1, zCoord - 1, setBlocks)
-                        || !isReplacable(xCoord - 1, yCoord + 1, zCoord + 1, setBlocks)
-                        || !isReplacable(xCoord + 1, yCoord - 1, zCoord + 1, setBlocks)
-                        || !isReplacable(xCoord - 1, yCoord - 1, zCoord - 1, setBlocks)
-                        || !isReplacable(xCoord + 1, yCoord - 1, zCoord - 1, setBlocks)
-                        || !isReplacable(xCoord - 1, yCoord - 1, zCoord + 1, setBlocks))
-                    return false;
-                break;
-            case 2:
-                if (!testOrActivateRect(1, 1, 1, "draconiumBlock", setBlocks, activate)) return false;
-                break;
-            case 3:
-                if (!testOrActivateSides(1, "draconiumBlock", setBlocks, activate)) return false;
-                if (!testOrActivateRect(1, 1, 1, "redstone", setBlocks, activate)) return false;
-                break;
-            case 4:
-                if (!testOrActivateSides(2, "draconiumBlock", setBlocks, activate)) return false;
-                if (!testOrActivateRect(2, 1, 1, "redstone", setBlocks, activate)) return false;
-                if (!testOrActivateRect(1, 2, 1, "redstone", setBlocks, activate)) return false;
-                if (!testOrActivateRect(1, 1, 2, "redstone", setBlocks, activate)) return false;
-                if (!testOrActivateRings(2, 2, "draconiumBlock", setBlocks, activate)) return false;
-                break;
-            case 5:
-                if (!testOrActivateSides(3, "draconiumBlock", setBlocks, activate)) return false;
-                if (!testOrActivateSides(2, "redstone", setBlocks, activate)) return false;
-                if (!testOrActivateRect(2, 2, 2, "redstone", setBlocks, activate)) return false;
-                if (!testOrActivateRings(2, 3, "draconiumBlock", setBlocks, activate)) return false;
-                break;
-            case 6:
-                if (!testOrActivateSides(4, "draconiumBlock", setBlocks, activate)) return false;
-                if (!testOrActivateSides(3, "redstone", setBlocks, activate)) return false;
-                if (!testOrActivateRect(3, 2, 2, "redstone", setBlocks, activate)) return false;
-                if (!testOrActivateRect(2, 3, 2, "redstone", setBlocks, activate)) return false;
-                if (!testOrActivateRect(2, 2, 3, "redstone", setBlocks, activate)) return false;
-                if (!testOrActivateRings(2, 4, "draconiumBlock", setBlocks, activate)) return false;
-                if (!testOrActivateRings(3, 3, "draconiumBlock", setBlocks, activate)) return false;
-                break;
-        }
-        return true;
-    }
-
-    private boolean testOrActivateRect(int xDim, int yDim, int zDim, String block, boolean set, boolean activate) {
-        for (int x = xCoord - xDim; x <= xCoord + xDim; x++) {
-            for (int y = yCoord - yDim; y <= yCoord + yDim; y++) {
-                for (int z = zCoord - zDim; z <= zCoord + zDim; z++) {
-
-                    if (block.equals("air")) {
-                        if (!(x == xCoord && y == yCoord && z == zCoord) && !isReplacable(x, y, z, set)) return false;
-                    } else if (block.equals("redstone")) {
-                        if (!(x == xCoord && y == yCoord && z == zCoord)
-                                && !testForOrActivateRedstone(x, y, z, set, activate))
-                            return false;
-                    } else if (block.equals("draconiumBlock")) {
-                        if (!(x == xCoord && y == yCoord && z == zCoord)
-                                && !testForOrActivateDraconium(x, y, z, set, activate))
-                            return false;
-                    } else if (!block.equals("draconiumBlock") && !block.equals("redstone") && !block.equals("air")) {
-                        LogHelper.error("Invalid String In Multiblock Structure Code!!!");
-                        return false;
-                    }
-                }
+            if (isOuterBlock(xCoord + 1, yCoord + 1, zCoord)) {
+                tier = 2;
             }
         }
         return true;
     }
 
-    private boolean testOrActivateRings(int size, int dist, String block, boolean set, boolean activate) {
-        for (int y = yCoord - size; y <= yCoord + size; y++) {
-            for (int z = zCoord - size; z <= zCoord + size; z++) {
+    private boolean scanStructure(IBlockAction innerBlock, IBlockAction outerBlock) {
+        final IBlockAction isReplaceable = this::isReplaceable;
+        return switch (tier) {
+            case 0 -> scanCube(isReplaceable, 1);
+            case 1 -> scanRings(isReplaceable, 1, 1) && scanSides(outerBlock, 0, 1);
+            case 2 -> scanCube(outerBlock, 1);
+            case 3 -> scanCube(innerBlock, 1) && scanSides(outerBlock, 1, 2);
+            case 4 -> scanCube(innerBlock, 1) && scanSides(innerBlock, 1, 2)
+                    && scanSides(outerBlock, 1, 3)
+                    && scanRings(outerBlock, 2, 2);
+            case 5 -> scanCube(innerBlock, 2) && scanSides(innerBlock, 1, 3)
+                    && scanSides(outerBlock, 1, 4)
+                    && scanRings(outerBlock, 2, 3);
+            case 6 -> scanCube(innerBlock, 2) && scanSides(innerBlock, 2, 3)
+                    && scanSides(innerBlock, 1, 4)
+                    && scanSides(outerBlock, 1, 5)
+                    && scanRings(outerBlock, 2, 4)
+                    && scanRings(outerBlock, 3, 3);
+            default -> false;
+        };
+    }
 
-                if (y == yCoord - size || y == yCoord + size || z == zCoord - size || z == zCoord + size) {
-                    if (block.equals("air")) {
-                        if (!(xCoord + dist == xCoord && y == yCoord && z == zCoord)
-                                && !isReplacable(xCoord + dist, y, z, set))
-                            return false;
-                    } else if (block.equals("redstone")) {
-                        if (!(xCoord + dist == xCoord && y == yCoord && z == zCoord)
-                                && !testForOrActivateRedstone(xCoord + dist, y, z, set, activate))
-                            return false;
-                    } else if (block.equals("draconiumBlock")) {
-                        if (!(xCoord + dist == xCoord && y == yCoord && z == zCoord)
-                                && !testForOrActivateDraconium(xCoord + dist, y, z, set, activate))
-                            return false;
-                    } else if (!block.equals("draconiumBlock") && !block.equals("redstone") && !block.equals("air")) {
-                        LogHelper.error("Invalid String In Multiblock Structure Code!!!");
-                        return false;
-                    }
-                }
-            }
-        }
-        for (int y = yCoord - size; y <= yCoord + size; y++) {
-            for (int z = zCoord - size; z <= zCoord + size; z++) {
-
-                if (y == yCoord - size || y == yCoord + size || z == zCoord - size || z == zCoord + size) {
-                    if (block.equals("air")) {
-                        if (!(xCoord - dist == xCoord && y == yCoord && z == zCoord)
-                                && !isReplacable(xCoord - dist, y, z, set))
-                            return false;
-                    } else if (block.equals("redstone")) {
-                        if (!(xCoord - dist == xCoord && y == yCoord && z == zCoord)
-                                && !testForOrActivateRedstone(xCoord - dist, y, z, set, activate))
-                            return false;
-                    } else if (block.equals("draconiumBlock")) {
-                        if (!(xCoord - dist == xCoord && y == yCoord && z == zCoord)
-                                && !testForOrActivateDraconium(xCoord - dist, y, z, set, activate))
-                            return false;
-                    } else if (!block.equals("draconiumBlock") && !block.equals("redstone") && !block.equals("air")) {
-                        LogHelper.error("Invalid String In Multiblock Structure Code!!!");
-                        return false;
-                    }
-                }
-            }
-        }
-
+    private boolean scanCube(IBlockAction action, int size) {
         for (int x = xCoord - size; x <= xCoord + size; x++) {
-            for (int z = zCoord - size; z <= zCoord + size; z++) {
-
-                if (x == xCoord - size || x == xCoord + size || z == zCoord - size || z == zCoord + size) {
-                    if (block.equals("air")) {
-                        if (!(x == xCoord && yCoord + dist == yCoord && z == zCoord)
-                                && !isReplacable(x, yCoord + dist, z, set))
-                            return false;
-                    } else if (block.equals("redstone")) {
-                        if (!(x == xCoord && yCoord + dist == yCoord && z == zCoord)
-                                && !testForOrActivateRedstone(x, yCoord + dist, z, set, activate))
-                            return false;
-                    } else if (block.equals("draconiumBlock")) {
-                        if (!(x == xCoord && yCoord + dist == yCoord && z == zCoord)
-                                && !testForOrActivateDraconium(x, yCoord + dist, z, set, activate))
-                            return false;
-                    } else if (!block.equals("draconiumBlock") && !block.equals("redstone") && !block.equals("air")) {
-                        LogHelper.error("Invalid String In Multiblock Structure Code!!!");
+            for (int y = yCoord - size; y <= yCoord + size; y++) {
+                for (int z = zCoord - size; z <= zCoord + size; z++) {
+                    if (x == xCoord && y == yCoord && z == zCoord) {
+                        continue;
+                    }
+                    if (!action.process(x, y, z)) {
                         return false;
                     }
+                }
+            }
+        }
+        return true;
+    }
+
+    private boolean scanRings(IBlockAction action, int radius, int distance) {
+        final boolean isAsymmetric = radius != distance;
+        for (int x = xCoord - radius; x <= xCoord + radius; x++) {
+            boolean isSuccessful = action.process(x, yCoord - radius, zCoord - distance)
+                    && action.process(x, yCoord - radius, zCoord + distance)
+                    && action.process(x, yCoord + radius, zCoord - distance)
+                    && action.process(x, yCoord + radius, zCoord + distance);
+            if (isSuccessful && isAsymmetric) {
+                isSuccessful = action.process(x, yCoord - distance, zCoord - radius)
+                        && action.process(x, yCoord - distance, zCoord + radius)
+                        && action.process(x, yCoord + distance, zCoord - radius)
+                        && action.process(x, yCoord + distance, zCoord + radius);
+            }
+            if (!isSuccessful) {
+                return false;
+            }
+        }
+        for (int y = yCoord - radius; y <= yCoord + radius; y++) {
+            boolean isSuccessful = action.process(xCoord - radius, y, zCoord - distance)
+                    && action.process(xCoord - radius, y, zCoord + distance)
+                    && action.process(xCoord + radius, y, zCoord - distance)
+                    && action.process(xCoord + radius, y, zCoord + distance);
+            if (isSuccessful && isAsymmetric) {
+                isSuccessful = action.process(xCoord - distance, y, zCoord - radius)
+                        && action.process(xCoord - distance, y, zCoord + radius)
+                        && action.process(xCoord + distance, y, zCoord - radius)
+                        && action.process(xCoord + distance, y, zCoord + radius);
+            }
+            if (!isSuccessful) {
+                return false;
+            }
+        }
+        for (int z = zCoord - radius; z <= zCoord + radius; z++) {
+            boolean isSuccessful = action.process(xCoord - radius, yCoord - distance, z)
+                    && action.process(xCoord - radius, yCoord + distance, z)
+                    && action.process(xCoord + radius, yCoord - distance, z)
+                    && action.process(xCoord + radius, yCoord + distance, z);
+            if (isSuccessful && isAsymmetric) {
+                isSuccessful = action.process(xCoord - distance, yCoord - radius, z)
+                        && action.process(xCoord - distance, yCoord + radius, z)
+                        && action.process(xCoord + distance, yCoord - radius, z)
+                        && action.process(xCoord + distance, yCoord + radius, z);
+            }
+            if (!isSuccessful) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean scanSides(IBlockAction action, int size, int distance) {
+        for (int x = xCoord - size; x <= xCoord + size; x++) {
+            for (int y = yCoord - size; y <= yCoord + size; y++) {
+                boolean isSuccessful = action.process(x, y, zCoord - distance)
+                        && action.process(x, y, zCoord + distance);
+                if (!isSuccessful) {
+                    return false;
                 }
             }
         }
         for (int x = xCoord - size; x <= xCoord + size; x++) {
             for (int z = zCoord - size; z <= zCoord + size; z++) {
-
-                if (x == xCoord - size || x == xCoord + size || z == zCoord - size || z == zCoord + size) {
-                    if (block.equals("air")) {
-                        if (!(x == xCoord && yCoord - dist == yCoord && z == zCoord)
-                                && !isReplacable(x, yCoord - dist, z, set))
-                            return false;
-                    } else if (block.equals("redstone")) {
-                        if (!(x == xCoord && yCoord - dist == yCoord && z == zCoord)
-                                && !testForOrActivateRedstone(x, yCoord - dist, z, set, activate))
-                            return false;
-                    } else if (block.equals("draconiumBlock")) {
-                        if (!(x == xCoord && yCoord - dist == yCoord && z == zCoord)
-                                && !testForOrActivateDraconium(x, yCoord - dist, z, set, activate))
-                            return false;
-                    } else if (!block.equals("draconiumBlock") && !block.equals("redstone") && !block.equals("air")) {
-                        LogHelper.error("Invalid String In Multiblock Structure Code!!!");
-                        return false;
-                    }
-                }
-            }
-        }
-
-        for (int y = yCoord - size; y <= yCoord + size; y++) {
-            for (int x = xCoord - size; x <= xCoord + size; x++) {
-
-                if (y == yCoord - size || y == yCoord + size || x == xCoord - size || x == xCoord + size) {
-                    if (block.equals("air")) {
-                        if (!(x == xCoord && y == yCoord && zCoord + dist == zCoord)
-                                && !isReplacable(x, y, zCoord + dist, set))
-                            return false;
-                    } else if (block.equals("redstone")) {
-                        if (!(x == xCoord && y == yCoord && zCoord + dist == zCoord)
-                                && !testForOrActivateRedstone(x, y, zCoord + dist, set, activate))
-                            return false;
-                    } else if (block.equals("draconiumBlock")) {
-                        if (!(x == xCoord && y == yCoord && zCoord + dist == zCoord)
-                                && !testForOrActivateDraconium(x, y, zCoord + dist, set, activate))
-                            return false;
-                    } else if (!block.equals("draconiumBlock") && !block.equals("redstone") && !block.equals("air")) {
-                        LogHelper.error("Invalid String In Multiblock Structure Code!!!");
-                        return false;
-                    }
+                boolean isSuccessful = action.process(x, yCoord - distance, z)
+                        && action.process(x, yCoord + distance, z);
+                if (!isSuccessful) {
+                    return false;
                 }
             }
         }
         for (int y = yCoord - size; y <= yCoord + size; y++) {
-            for (int x = xCoord - size; x <= xCoord + size; x++) {
-
-                if (y == yCoord - size || y == yCoord + size || x == xCoord - size || x == xCoord + size) {
-                    if (block.equals("air")) {
-                        if (!(x == xCoord && y == yCoord && zCoord - dist == zCoord)
-                                && !isReplacable(x, y, zCoord - dist, set))
-                            return false;
-                    } else if (block.equals("redstone")) {
-                        if (!(x == xCoord && y == yCoord && zCoord - dist == zCoord)
-                                && !testForOrActivateRedstone(x, y, zCoord - dist, set, activate))
-                            return false;
-                    } else if (block.equals("draconiumBlock")) {
-                        if (!(x == xCoord && y == yCoord && zCoord - dist == zCoord)
-                                && !testForOrActivateDraconium(x, y, zCoord - dist, set, activate))
-                            return false;
-                    } else if (!block.equals("draconiumBlock") && !block.equals("redstone") && !block.equals("air")) {
-                        LogHelper.error("Invalid String In Multiblock Structure Code!!!");
-                        return false;
-                    }
+            for (int z = zCoord - size; z <= zCoord + size; z++) {
+                boolean isSuccessful = action.process(xCoord - distance, y, z)
+                        && action.process(xCoord + distance, y, z);
+                if (!isSuccessful) {
+                    return false;
                 }
             }
         }
         return true;
     }
 
-    private boolean testOrActivateSides(int dist, String block, boolean set, boolean activate) {
-        dist++;
-        for (int y = yCoord - 1; y <= yCoord + 1; y++) {
-            for (int z = zCoord - 1; z <= zCoord + 1; z++) {
-
-                if (block.equals("air")) {
-                    if (!(xCoord + dist == xCoord && y == yCoord && z == zCoord)
-                            && !isReplacable(xCoord + dist, y, z, set))
-                        return false;
-                } else if (block.equals("redstone")) {
-                    if (!(xCoord + dist == xCoord && y == yCoord && z == zCoord)
-                            && !testForOrActivateRedstone(xCoord + dist, y, z, set, activate))
-                        return false;
-                } else if (block.equals("draconiumBlock")) {
-                    if (!(xCoord + dist == xCoord && y == yCoord && z == zCoord)
-                            && !testForOrActivateDraconium(xCoord + dist, y, z, set, activate))
-                        return false;
-                } else if (!block.equals("draconiumBlock") && !block.equals("redstone") && !block.equals("air")) {
-                    LogHelper.error("Invalid String In Multiblock Structure Code!!!");
-                    return false;
-                }
-            }
-        }
-        for (int y = yCoord - 1; y <= yCoord + 1; y++) {
-            for (int z = zCoord - 1; z <= zCoord + 1; z++) {
-
-                if (block.equals("air")) {
-                    if (!(xCoord - dist == xCoord && y == yCoord && z == zCoord)
-                            && !isReplacable(xCoord - dist, y, z, set))
-                        return false;
-                } else if (block.equals("redstone")) {
-                    if (!(xCoord - dist == xCoord && y == yCoord && z == zCoord)
-                            && !testForOrActivateRedstone(xCoord - dist, y, z, set, activate))
-                        return false;
-                } else if (block.equals("draconiumBlock")) {
-                    if (!(xCoord - dist == xCoord && y == yCoord && z == zCoord)
-                            && !testForOrActivateDraconium(xCoord - dist, y, z, set, activate))
-                        return false;
-                } else if (!block.equals("draconiumBlock") && !block.equals("redstone") && !block.equals("air")) {
-                    LogHelper.error("Invalid String In Multiblock Structure Code!!!");
-                    return false;
-                }
-            }
-        }
-
-        for (int x = xCoord - 1; x <= xCoord + 1; x++) {
-            for (int z = zCoord - 1; z <= zCoord + 1; z++) {
-
-                if (block.equals("air")) {
-                    if (!(x == xCoord && yCoord + dist == yCoord && z == zCoord)
-                            && !isReplacable(x, yCoord + dist, z, set))
-                        return false;
-                } else if (block.equals("redstone")) {
-                    if (!(x == xCoord && yCoord + dist == yCoord && z == zCoord)
-                            && !testForOrActivateRedstone(x, yCoord + dist, z, set, activate))
-                        return false;
-                } else if (block.equals("draconiumBlock")) {
-                    if (!(x == xCoord && yCoord + dist == yCoord && z == zCoord)
-                            && !testForOrActivateDraconium(x, yCoord + dist, z, set, activate))
-                        return false;
-                } else if (!block.equals("draconiumBlock") && !block.equals("redstone") && !block.equals("air")) {
-                    LogHelper.error("Invalid String In Multiblock Structure Code!!!");
-                    return false;
-                }
-            }
-        }
-        for (int x = xCoord - 1; x <= xCoord + 1; x++) {
-            for (int z = zCoord - 1; z <= zCoord + 1; z++) {
-
-                if (block.equals("air")) {
-                    if (!(x == xCoord && yCoord - dist == yCoord && z == zCoord)
-                            && !isReplacable(x, yCoord - dist, z, set))
-                        return false;
-                } else if (block.equals("redstone")) {
-                    if (!(x == xCoord && yCoord - dist == yCoord && z == zCoord)
-                            && !testForOrActivateRedstone(x, yCoord - dist, z, set, activate))
-                        return false;
-                } else if (block.equals("draconiumBlock")) {
-                    if (!(x == xCoord && yCoord - dist == yCoord && z == zCoord)
-                            && !testForOrActivateDraconium(x, yCoord - dist, z, set, activate))
-                        return false;
-                } else if (!block.equals("draconiumBlock") && !block.equals("redstone") && !block.equals("air")) {
-                    LogHelper.error("Invalid String In Multiblock Structure Code!!!");
-                    return false;
-                }
-            }
-        }
-
-        for (int y = yCoord - 1; y <= yCoord + 1; y++) {
-            for (int x = xCoord - 1; x <= xCoord + 1; x++) {
-
-                if (block.equals("air")) {
-                    if (!(x == xCoord && y == yCoord && zCoord + dist == zCoord)
-                            && !isReplacable(x, y, zCoord + dist, set))
-                        return false;
-                } else if (block.equals("redstone")) {
-                    if (!(x == xCoord && y == yCoord && zCoord + dist == zCoord)
-                            && !testForOrActivateRedstone(x, y, zCoord + dist, set, activate))
-                        return false;
-                } else if (block.equals("draconiumBlock")) {
-                    if (!(x == xCoord && y == yCoord && zCoord + dist == zCoord)
-                            && !testForOrActivateDraconium(x, y, zCoord + dist, set, activate))
-                        return false;
-                } else if (!block.equals("draconiumBlock") && !block.equals("redstone") && !block.equals("air")) {
-                    LogHelper.error("Invalid String In Multiblock Structure Code!!!");
-                    return false;
-                }
-            }
-        }
-        for (int y = yCoord - 1; y <= yCoord + 1; y++) {
-            for (int x = xCoord - 1; x <= xCoord + 1; x++) {
-
-                if (block.equals("air")) {
-                    if (!(x == xCoord && y == yCoord && zCoord - dist == zCoord)
-                            && !isReplacable(x, y, zCoord - dist, set))
-                        return false;
-                } else if (block.equals("redstone")) {
-                    if (!(x == xCoord && y == yCoord && zCoord - dist == zCoord)
-                            && !testForOrActivateRedstone(x, y, zCoord - dist, set, activate))
-                        return false;
-                } else if (block.equals("draconiumBlock")) {
-                    if (!(x == xCoord && y == yCoord && zCoord - dist == zCoord)
-                            && !testForOrActivateDraconium(x, y, zCoord - dist, set, activate))
-                        return false;
-                } else if (!block.equals("draconiumBlock") && !block.equals("redstone") && !block.equals("air")) {
-                    LogHelper.error("Invalid String In Multiblock Structure Code!!!");
-                    return false;
-                }
-            }
-        }
-
-        return true;
+    private boolean isReplaceable(int x, int y, int z) {
+        return worldObj.isAirBlock(x, y, z) || worldObj.getBlock(x, y, z).isReplaceable(worldObj, x, y, z);
     }
 
-    private boolean testForOrActivateDraconium(int x, int y, int z, boolean set, boolean activate) {
-        if (!activate) {
-            if (set) {
-                worldObj.setBlock(
-                        x,
-                        y,
-                        z,
-                        BalanceConfigHandler.energyStorageStructureOuterBlock,
-                        BalanceConfigHandler.energyStorageStructureOuterBlockMetadata,
-                        3);
-                return true;
-            } else return (worldObj.getBlock(x, y, z) == BalanceConfigHandler.energyStorageStructureOuterBlock
-                    && worldObj.getBlockMetadata(x, y, z)
-                            == BalanceConfigHandler.energyStorageStructureOuterBlockMetadata)
-                    || (worldObj.getBlock(x, y, z) == ModBlocks.invisibleMultiblock
-                            && worldObj.getBlockMetadata(x, y, z) == 0);
-        } else {
-            return activateDraconium(x, y, z);
-        }
+    private boolean isInnerBlock(int x, int y, int z) {
+        Block block = worldObj.getBlock(x, y, z);
+        int metadata = worldObj.getBlockMetadata(x, y, z);
+        return (block == BalanceConfigHandler.energyStorageStructureBlock
+                && metadata == BalanceConfigHandler.energyStorageStructureBlockMetadata)
+                || (block == ModBlocks.invisibleMultiblock && metadata == 1);
     }
 
-    private boolean testForOrActivateRedstone(int x, int y, int z, boolean set, boolean activate) {
-        if (!activate) {
-            if (set) {
-                worldObj.setBlock(
-                        x,
-                        y,
-                        z,
-                        BalanceConfigHandler.energyStorageStructureBlock,
-                        BalanceConfigHandler.energyStorageStructureBlockMetadata,
-                        3);
-                return true;
-            } else {
-                return (worldObj.getBlock(x, y, z) == BalanceConfigHandler.energyStorageStructureBlock
-                        && worldObj.getBlockMetadata(x, y, z)
-                                == BalanceConfigHandler.energyStorageStructureBlockMetadata)
-                        || (worldObj.getBlock(x, y, z) == ModBlocks.invisibleMultiblock
-                                && worldObj.getBlockMetadata(x, y, z) == 1);
-            }
-        } else {
-            return activateRedstone(x, y, z);
-        }
-    }
-
-    private boolean activateDraconium(int x, int y, int z) {
-        if (testForOrActivateDraconium(x, y, z, false, false)) {
-            worldObj.setBlock(x, y, z, ModBlocks.invisibleMultiblock, 0, 2);
-            TileInvisibleMultiblock tile = (worldObj.getTileEntity(x, y, z) != null
-                    && worldObj.getTileEntity(x, y, z) instanceof TileInvisibleMultiblock)
-                            ? (TileInvisibleMultiblock) worldObj.getTileEntity(x, y, z)
-                            : null;
-            if (tile != null) {
-                tile.master = new TileLocation(xCoord, yCoord, zCoord);
-            }
-            return true;
-        }
-        LogHelper.error("Failed to activate structure (activateDraconium)");
-        return false;
-    }
-
-    private boolean activateRedstone(int x, int y, int z) {
-        if (testForOrActivateRedstone(x, y, z, false, false)) {
-            worldObj.setBlock(x, y, z, ModBlocks.invisibleMultiblock, 1, 2);
-            TileInvisibleMultiblock tile = (worldObj.getTileEntity(x, y, z) != null
-                    && worldObj.getTileEntity(x, y, z) instanceof TileInvisibleMultiblock)
-                            ? (TileInvisibleMultiblock) worldObj.getTileEntity(x, y, z)
-                            : null;
-            if (tile != null) {
-                tile.master = new TileLocation(xCoord, yCoord, zCoord);
-            }
+    private boolean activateInnerBlock(int x, int y, int z) {
+        worldObj.setBlock(x, y, z, ModBlocks.invisibleMultiblock, 1, 2);
+        TileEntity tile = worldObj.getTileEntity(x, y, z);
+        if (tile instanceof TileInvisibleMultiblock multiblock) {
+            multiblock.master = new TileLocation(xCoord, yCoord, zCoord);
             return true;
         }
         LogHelper.error("Failed to activate structure (activateRedstone)");
         return false;
     }
 
-    private boolean isReplacable(int x, int y, int z, boolean set) {
-        if (set) {
-            worldObj.setBlock(x, y, z, Blocks.air);
+    private boolean setInnerBlock(int x, int y, int z) {
+        worldObj.setBlock(
+                x,
+                y,
+                z,
+                BalanceConfigHandler.energyStorageStructureBlock,
+                BalanceConfigHandler.energyStorageStructureBlockMetadata,
+                3);
+        return true;
+    }
+
+    private boolean isOuterBlock(int x, int y, int z) {
+        Block block = worldObj.getBlock(x, y, z);
+        int metadata = worldObj.getBlockMetadata(x, y, z);
+        return (block == BalanceConfigHandler.energyStorageStructureOuterBlock
+                && metadata == BalanceConfigHandler.energyStorageStructureOuterBlockMetadata)
+                || (block == ModBlocks.invisibleMultiblock && metadata == 0);
+    }
+
+    private boolean activateOuterBlock(int x, int y, int z) {
+        worldObj.setBlock(x, y, z, ModBlocks.invisibleMultiblock, 0, 2);
+        TileEntity tile = worldObj.getTileEntity(x, y, z);
+        if (tile instanceof TileInvisibleMultiblock multiblock) {
+            multiblock.master = new TileLocation(xCoord, yCoord, zCoord);
             return true;
-        } else return worldObj.getBlock(x, y, z).isReplaceable(worldObj, x, y, z) || worldObj.isAirBlock(x, y, z);
+        }
+        LogHelper.error("Failed to activate structure (activateDraconium)");
+        return false;
+    }
+
+    private boolean setOuterBlock(int x, int y, int z) {
+        worldObj.setBlock(
+                x,
+                y,
+                z,
+                BalanceConfigHandler.energyStorageStructureOuterBlock,
+                BalanceConfigHandler.energyStorageStructureOuterBlockMetadata,
+                3);
+        return true;
     }
 
     public boolean isOnline() {
@@ -695,33 +355,18 @@ public class TileEnergyStorageCore extends TileObjectSync {
     }
 
     private void activateStabilizers() {
-        for (int i = 0; i < stabilizers.length; i++) {
-            if (stabilizers[i] == null) {
-                LogHelper.error("activateStabilizers stabalizers[" + i + "] == null!!!");
-                return;
-            }
-            TileParticleGenerator tile = (worldObj
-                    .getTileEntity(stabilizers[i].getXCoord(), stabilizers[i].getYCoord(), stabilizers[i].getZCoord())
-                    != null
-                    && worldObj.getTileEntity(
-                            stabilizers[i].getXCoord(),
-                            stabilizers[i].getYCoord(),
-                            stabilizers[i].getZCoord()) instanceof TileParticleGenerator)
-                                    ? (TileParticleGenerator) worldObj.getTileEntity(
-                                            stabilizers[i].getXCoord(),
-                                            stabilizers[i].getYCoord(),
-                                            stabilizers[i].getZCoord())
-                                    : null;
-            if (tile == null) {
+        for (TileLocation stabilizer : stabilizers) {
+            TileEntity tile = stabilizer.getTileEntity(worldObj);
+            if (!(tile instanceof TileParticleGenerator particleGenerator)) {
                 LogHelper.error("Missing Tile Entity (Particle Generator)");
                 return;
             }
-            tile.stabalizerMode = true;
-            tile.setMaster(new TileLocation(xCoord, yCoord, zCoord));
+            particleGenerator.isInStabilizerMode = true;
+            particleGenerator.setMaster(new TileLocation(xCoord, yCoord, zCoord));
             worldObj.setBlockMetadataWithNotify(
-                    stabilizers[i].getXCoord(),
-                    stabilizers[i].getYCoord(),
-                    stabilizers[i].getZCoord(),
+                    stabilizer.getXCoord(),
+                    stabilizer.getYCoord(),
+                    stabilizer.getZCoord(),
                     1,
                     2);
         }
@@ -729,117 +374,48 @@ public class TileEnergyStorageCore extends TileObjectSync {
     }
 
     private void initializeCapacity() {
-        long capacity = 0;
-        switch (tier) {
-            case 0:
-                capacity = BalanceConfigHandler.energyStorageTier1Storage;
-                break;
-            case 1:
-                capacity = BalanceConfigHandler.energyStorageTier2Storage;
-                break;
-            case 2:
-                capacity = BalanceConfigHandler.energyStorageTier3Storage;
-                break;
-            case 3:
-                capacity = BalanceConfigHandler.energyStorageTier4Storage;
-                break;
-            case 4:
-                capacity = BalanceConfigHandler.energyStorageTier5Storage;
-                break;
-            case 5:
-                capacity = BalanceConfigHandler.energyStorageTier6Storage;
-                break;
-            case 6:
-                capacity = BalanceConfigHandler.energyStorageTier7Storage;
-                break;
-        }
+        long capacity = switch (tier) {
+            case 0 -> BalanceConfigHandler.energyStorageTier1Storage;
+            case 1 -> BalanceConfigHandler.energyStorageTier2Storage;
+            case 2 -> BalanceConfigHandler.energyStorageTier3Storage;
+            case 3 -> BalanceConfigHandler.energyStorageTier4Storage;
+            case 4 -> BalanceConfigHandler.energyStorageTier5Storage;
+            case 5 -> BalanceConfigHandler.energyStorageTier6Storage;
+            case 6 -> BalanceConfigHandler.energyStorageTier7Storage;
+            default -> 0;
+        };
         this.capacity = capacity;
         if (energy > capacity) energy = capacity;
     }
 
     public void deactivateStabilizers() {
-        for (int i = 0; i < stabilizers.length; i++) {
-            if (stabilizers[i] == null) {
-                LogHelper.error("activateStabilizers stabalizers[" + i + "] == null!!!");
-            } else {
-                TileParticleGenerator tile = (worldObj.getTileEntity(
-                        stabilizers[i].getXCoord(),
-                        stabilizers[i].getYCoord(),
-                        stabilizers[i].getZCoord()) != null
-                        && worldObj.getTileEntity(
-                                stabilizers[i].getXCoord(),
-                                stabilizers[i].getYCoord(),
-                                stabilizers[i].getZCoord()) instanceof TileParticleGenerator)
-                                        ? (TileParticleGenerator) worldObj.getTileEntity(
-                                                stabilizers[i].getXCoord(),
-                                                stabilizers[i].getYCoord(),
-                                                stabilizers[i].getZCoord())
-                                        : null;
-                if (tile == null) {
-                    // LogHelper.error("Missing Tile Entity (Particle Generator)");
-                } else {
-                    tile.stabalizerMode = false;
-                    worldObj.setBlockMetadataWithNotify(
-                            stabilizers[i].getXCoord(),
-                            stabilizers[i].getYCoord(),
-                            stabilizers[i].getZCoord(),
-                            0,
-                            2);
-                }
+        for (TileLocation stabilizer : stabilizers) {
+            TileEntity tile = stabilizer.getTileEntity(worldObj);
+            if (tile instanceof TileParticleGenerator particleGenerator) {
+                particleGenerator.isInStabilizerMode = false;
+                worldObj.setBlockMetadataWithNotify(
+                        stabilizer.getXCoord(),
+                        stabilizer.getYCoord(),
+                        stabilizer.getZCoord(),
+                        0,
+                        2);
             }
         }
     }
 
     private boolean areStabilizersActive() {
-        for (int i = 0; i < stabilizers.length; i++) {
-            if (stabilizers[i] == null) {
-                LogHelper.error("activateStabilizers stabalizers[" + i + "] == null!!!");
+        for (TileLocation stabilizer : stabilizers) {
+            TileEntity tile = stabilizer.getTileEntity(worldObj);
+            if (!(tile instanceof TileParticleGenerator particleGenerator)) {
                 return false;
             }
-            TileParticleGenerator tile = (worldObj
-                    .getTileEntity(stabilizers[i].getXCoord(), stabilizers[i].getYCoord(), stabilizers[i].getZCoord())
-                    != null
-                    && worldObj.getTileEntity(
-                            stabilizers[i].getXCoord(),
-                            stabilizers[i].getYCoord(),
-                            stabilizers[i].getZCoord()) instanceof TileParticleGenerator)
-                                    ? (TileParticleGenerator) worldObj.getTileEntity(
-                                            stabilizers[i].getXCoord(),
-                                            stabilizers[i].getYCoord(),
-                                            stabilizers[i].getZCoord())
-                                    : null;
-            if (tile == null) {
-                // LogHelper.error("Missing Tile Entity (Particle Generator)");
+            if (!particleGenerator.isInStabilizerMode || stabilizer.getBlockMetadata(worldObj) != 1) {
                 return false;
             }
-            if (!tile.stabalizerMode || worldObj.getBlockMetadata(
-                    stabilizers[i].getXCoord(),
-                    stabilizers[i].getYCoord(),
-                    stabilizers[i].getZCoord()) != 1)
+            TileEnergyStorageCore core = particleGenerator.getMaster();
+            if (core == null || core.xCoord != xCoord || core.yCoord != yCoord || core.zCoord != zCoord) {
                 return false;
-        }
-        return true;
-    }
-
-    private boolean checkStabilizers() {
-        for (int i = 0; i < stabilizers.length; i++) {
-            if (stabilizers[i] == null) return false;
-            TileParticleGenerator gen = (worldObj
-                    .getTileEntity(stabilizers[i].getXCoord(), stabilizers[i].getYCoord(), stabilizers[i].getZCoord())
-                    != null
-                    && worldObj.getTileEntity(
-                            stabilizers[i].getXCoord(),
-                            stabilizers[i].getYCoord(),
-                            stabilizers[i].getZCoord()) instanceof TileParticleGenerator)
-                                    ? (TileParticleGenerator) worldObj.getTileEntity(
-                                            stabilizers[i].getXCoord(),
-                                            stabilizers[i].getYCoord(),
-                                            stabilizers[i].getZCoord())
-                                    : null;
-            if (gen == null || !gen.stabalizerMode) return false;
-            if (gen.getMaster().xCoord != xCoord || gen.getMaster().yCoord != yCoord
-                    || gen.getMaster().zCoord != zCoord)
-                return false;
+            }
         }
         return true;
     }
@@ -858,18 +434,18 @@ public class TileEnergyStorageCore extends TileObjectSync {
         compound.setShort("Tier", (short) tier);
         compound.setLong("EnergyL", energy);
         for (int i = 0; i < stabilizers.length; i++) {
-            if (stabilizers[i] != null) stabilizers[i].writeToNBT(compound, String.valueOf(i));
+            stabilizers[i].writeToNBT(compound, String.valueOf(i));
         }
     }
 
     @Override
     public void readFromNBT(NBTTagCompound compound) {
         online = compound.getBoolean("Online");
-        tier = (int) compound.getShort("Tier");
+        tier = compound.getShort("Tier");
         energy = compound.getLong("EnergyL");
         if (compound.hasKey("Energy")) energy = (long) compound.getDouble("Energy");
         for (int i = 0; i < stabilizers.length; i++) {
-            if (stabilizers[i] != null) stabilizers[i].readFromNBT(compound, String.valueOf(i));
+            stabilizers[i].readFromNBT(compound, String.valueOf(i));
         }
         initializeCapacity();
         super.readFromNBT(compound);
@@ -915,6 +491,24 @@ public class TileEnergyStorageCore extends TileObjectSync {
         return capacity;
     }
 
+    public List<String> getDisplayInformation(boolean shouldShowName) {
+        List<String> information = new ArrayList<>();
+        if (shouldShowName) {
+            information.add(InfoHelper.HITC() + ModBlocks.energyStorageCore.getLocalizedName());
+        }
+        information.add(StatCollector.translateToLocal("info.de.tier.txt") + ": " + InfoHelper.ITC() + (tier + 1));
+        information.add(
+                StatCollector.translateToLocal("info.de.charge.txt") + ": "
+                        + InfoHelper.ITC()
+                        + Utills.formatNumber(energy)
+                        + " / "
+                        + Utills.formatNumber(capacity)
+                        + " ["
+                        + Utills.addCommas(energy)
+                        + " RF]");
+        return information;
+    }
+
     @Override
     public AxisAlignedBB getRenderBoundingBox() {
         return INFINITE_EXTENT_AABB;
@@ -925,12 +519,14 @@ public class TileEnergyStorageCore extends TileObjectSync {
         return 40960.0D;
     }
 
-    private void detectAndRendChanges() {
-        if (lastTickCapacity != energy) lastTickCapacity = (Long) sendObjectToClient(
-                References.LONG_ID,
-                0,
-                energy,
-                new NetworkRegistry.TargetPoint(worldObj.provider.dimensionId, xCoord, yCoord, zCoord, 20));
+    private void detectAndSendChanges() {
+        if (lastTickCapacity != energy) {
+            lastTickCapacity = (long) sendObjectToClient(
+                    References.LONG_ID,
+                    0,
+                    energy,
+                    new NetworkRegistry.TargetPoint(worldObj.provider.dimensionId, xCoord, yCoord, zCoord, 20));
+        }
     }
 
     @Override

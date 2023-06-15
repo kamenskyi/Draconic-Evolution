@@ -5,36 +5,42 @@ import java.util.List;
 
 import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.tileentity.TileEntityRendererDispatcher;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.StatCollector;
 
 import org.lwjgl.opengl.GL11;
 
-import com.brandon3055.brandonscore.client.gui.guicomponents.*;
+import com.brandon3055.brandonscore.client.gui.guicomponents.ComponentButton;
+import com.brandon3055.brandonscore.client.gui.guicomponents.ComponentCollection;
+import com.brandon3055.brandonscore.client.gui.guicomponents.ComponentTextureButton;
+import com.brandon3055.brandonscore.client.gui.guicomponents.ComponentTexturedRect;
+import com.brandon3055.brandonscore.client.gui.guicomponents.GUIBase;
 import com.brandon3055.brandonscore.client.utills.GuiHelper;
 import com.brandon3055.brandonscore.common.utills.Utills;
 import com.brandon3055.draconicevolution.client.handler.ResourceHandler;
 import com.brandon3055.draconicevolution.common.container.ContainerReactor;
 import com.brandon3055.draconicevolution.common.tileentities.multiblocktiles.reactor.TileReactorCore;
+import com.brandon3055.draconicevolution.common.tileentities.multiblocktiles.reactor.TileReactorCore.ReactorState;
 
 /**
  * Created by brandon3055 on 30/7/2015.
  */
 public class GUIReactor extends GUIBase {
 
-    private TileReactorCore reactor;
-    private ContainerReactor container;
-    private static boolean showStats = false;
+    private static boolean showStatistics = false;
+    private final TileReactorCore core;
+    private final ContainerReactor container;
 
-    public GUIReactor(EntityPlayer player, TileReactorCore reactor, ContainerReactor container) {
+    public GUIReactor(TileReactorCore core, ContainerReactor container) {
         super(container, 248, 222);
-        this.reactor = reactor;
+        this.core = core;
         this.container = container;
     }
 
     @Override
     protected ComponentCollection assembleComponents() {
+        final ResourceLocation widgets = ResourceHandler.getResource("textures/gui/Widgets.png");
         collection = new ComponentCollection(0, 0, 248, 222, this);
         collection.addComponent(
                 new ComponentTexturedRect(0, 0, xSize, ySize, ResourceHandler.getResource("textures/gui/Reactor.png")));
@@ -50,7 +56,7 @@ public class GUIReactor extends GUIBase {
                         this,
                         "",
                         StatCollector.translateToLocal("button.de.reactorCharge.txt"),
-                        ResourceHandler.getResource("textures/gui/Widgets.png")))
+                        widgets))
                 .setName("CHARGE");
         collection.addComponent(
                 new ComponentTextureButton(
@@ -64,7 +70,7 @@ public class GUIReactor extends GUIBase {
                         this,
                         "",
                         StatCollector.translateToLocal("button.de.reactorStart.txt"),
-                        ResourceHandler.getResource("textures/gui/Widgets.png")))
+                        widgets))
                 .setName("ACTIVATE");
         collection.addComponent(
                 new ComponentTextureButton(
@@ -78,7 +84,7 @@ public class GUIReactor extends GUIBase {
                         this,
                         "",
                         StatCollector.translateToLocal("button.de.reactorStop.txt"),
-                        ResourceHandler.getResource("textures/gui/Widgets.png")))
+                        widgets))
                 .setName("DEACTIVATE");
         collection.addComponent(
                 new ComponentButton(
@@ -95,10 +101,10 @@ public class GUIReactor extends GUIBase {
     }
 
     @Override
-    protected void drawGuiContainerBackgroundLayer(float f, int mouseX, int mouseY) {
-        super.drawGuiContainerBackgroundLayer(f, mouseX, mouseY);
+    protected void drawGuiContainerBackgroundLayer(float partialTicks, int mouseX, int mouseY) {
+        super.drawGuiContainerBackgroundLayer(partialTicks, mouseX, mouseY);
         // Draw I/O Slots
-        if (reactor.reactorState == TileReactorCore.STATE_OFFLINE) {
+        if (core.reactorState == ReactorState.OFFLINE) {
             RenderHelper.enableGUIStandardItemLighting();
             drawTexturedModalRect(guiLeft + 14, guiTop + 139, 14, ySize, 18, 18);
             drawTexturedModalRect(guiLeft + 216, guiTop + 139, 32, ySize, 18, 18);
@@ -123,96 +129,86 @@ public class GUIReactor extends GUIBase {
 
         GL11.glColor4f(1f, 1f, 1f, 1f);
         // Draw Indicators
-        double value = Math.min(reactor.reactionTemperature, reactor.maxReactTemperature) / reactor.maxReactTemperature;
+        double value = Math.min(core.reactionTemperature, core.maxReactTemperature) / core.maxReactTemperature;
         int pixOffset = (int) (value * 108);
         drawTexturedModalRect(11, 112 - pixOffset, 0, 222, 14, 5);
 
-        value = reactor.fieldCharge / reactor.maxFieldCharge;
+        value = core.fieldCharge / core.maxFieldCharge;
         pixOffset = (int) (value * 108);
         drawTexturedModalRect(35, 112 - pixOffset, 0, 222, 14, 5);
 
-        value = (double) reactor.energySaturation / (double) reactor.maxEnergySaturation;
+        value = (double) core.energySaturation / (double) core.maxEnergySaturation;
         pixOffset = (int) (value * 108);
         drawTexturedModalRect(199, 112 - pixOffset, 0, 222, 14, 5);
 
-        value = ((double) reactor.convertedFuel) / ((double) reactor.reactorFuel + (double) reactor.convertedFuel);
+        value = ((double) core.convertedFuel) / ((double) core.reactorFuel + (double) core.convertedFuel);
         pixOffset = (int) (value * 108);
         drawTexturedModalRect(223, 112 - pixOffset, 0, 222, 14, 5);
 
         GL11.glColor4f(1F, 1F, 1F, 1F);
-        if (!showStats) {
-
+        if (showStatistics) {
+            ResourceHandler.bindResource("textures/gui/Reactor.png");
+            for (int i = 1; i <= 10; i++) {
+                drawTexturedModalRect(63, i * 12, 0, 240, 122, 16);
+            }
+            drawStatistics();
+        } else {
             GL11.glPushMatrix();
             GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
             GL11.glTranslated(124, 71, 100);
-            double scale = 100 / (reactor.getCoreDiameter());
+            double scale = 100 / (core.getCoreDiameter());
             GL11.glScaled(scale, scale, scale);
             GL11.glColor4f(1F, 1F, 1F, 1F);
             GL11.glDisable(GL11.GL_CULL_FACE);
 
-            TileEntityRendererDispatcher.instance.renderTileEntityAt(reactor, -0.5D, -0.5D, -0.5D, 0.0F);
+            TileEntityRendererDispatcher.instance.renderTileEntityAt(core, -0.5D, -0.5D, -0.5D, 0.0F);
 
             GL11.glPopAttrib();
             GL11.glPopMatrix();
-        } else {
-            ResourceHandler.bindResource("textures/gui/Reactor.png");
-            for (int i = 1; i <= 10; i++) drawTexturedModalRect(63, i * 12, 0, 240, 122, 16);
-            drawStats();
+            drawStatus();
         }
-
-        String status = StatCollector.translateToLocal("gui.de.status.txt") + ": "
-                + (reactor.reactorState == 0 ? EnumChatFormatting.DARK_GRAY
-                        : reactor.reactorState == 1 ? EnumChatFormatting.RED
-                                : reactor.reactorState == 2 ? EnumChatFormatting.DARK_GREEN : EnumChatFormatting.RED)
-                + StatCollector.translateToLocal("gui.de.status" + reactor.reactorState + ".txt");
-        if (reactor.reactorState == 1 && reactor.canStart())
-            status = StatCollector.translateToLocal("gui.de.status.txt") + ": "
-                    + EnumChatFormatting.DARK_GREEN
-                    + StatCollector.translateToLocal("gui.de.status1_5.txt");
-        if (!showStats) fontRendererObj.drawString(status, xSize - 5 - fontRendererObj.getStringWidth(status), 125, 0);
     }
 
     @Override
-    public void drawScreen(int mouseX, int mouseY, float par3) {
-        super.drawScreen(mouseX, mouseY, par3);
-        List<String> text = new ArrayList<String>();
+    @SuppressWarnings("unchecked")
+    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+        super.drawScreen(mouseX, mouseY, partialTicks);
+        List<String> text = new ArrayList<>();
         if (GuiHelper.isInRect(9, 4, 18, 114, mouseX - guiLeft, mouseY - guiTop)) {
             text.add(StatCollector.translateToLocal("gui.de.reactionTemp.txt"));
-            text.add((int) reactor.reactionTemperature + "C");
+            text.add((int) core.reactionTemperature + "C");
             drawHoveringText(text, mouseX, mouseY, fontRendererObj);
         } else if (GuiHelper.isInRect(33, 4, 18, 114, mouseX - guiLeft, mouseY - guiTop)) {
             text.add(StatCollector.translateToLocal("gui.de.fieldStrength.txt"));
-            if (reactor.maxFieldCharge > 0)
-                text.add(Utills.round(reactor.fieldCharge / reactor.maxFieldCharge * 100D, 100D) + "%");
-            text.add(
-                    Utills.addCommas((int) reactor.fieldCharge) + " / "
-                            + Utills.addCommas((int) reactor.maxFieldCharge)); // todo refine or remove
+            if (core.maxFieldCharge > 0) {
+                text.add(Utills.round(core.fieldCharge / core.maxFieldCharge * 100D, 100D) + "%");
+            }
+            text.add(Utills.addCommas((int) core.fieldCharge) + " / " + Utills.addCommas((int) core.maxFieldCharge));
             drawHoveringText(text, mouseX, mouseY, fontRendererObj);
         } else if (GuiHelper.isInRect(197, 4, 18, 114, mouseX - guiLeft, mouseY - guiTop)) {
             text.add(StatCollector.translateToLocal("gui.de.energySaturation.txt"));
-            if (reactor.maxEnergySaturation > 0) text.add(
-                    Utills.round((double) reactor.energySaturation / (double) reactor.maxEnergySaturation * 100D, 100D)
-                            + "%");
-            text.add(
-                    Utills.addCommas(reactor.energySaturation) + " / " + Utills.addCommas(reactor.maxEnergySaturation)); // todo
-                                                                                                                         // refine
-                                                                                                                         // or
-                                                                                                                         // remove
+            if (core.maxEnergySaturation > 0) {
+                text.add(
+                        Utills.round((double) core.energySaturation / (double) core.maxEnergySaturation * 100D, 100D)
+                                + "%");
+            }
+            text.add(Utills.addCommas(core.energySaturation) + " / " + Utills.addCommas(core.maxEnergySaturation));
             drawHoveringText(text, mouseX, mouseY, fontRendererObj);
         } else if (GuiHelper.isInRect(221, 4, 18, 114, mouseX - guiLeft, mouseY - guiTop)) {
             text.add(StatCollector.translateToLocal("gui.de.fuelConversion.txt"));
-            if (reactor.reactorFuel + reactor.convertedFuel > 0) text.add(
-                    Utills.round(
-                            ((double) reactor.convertedFuel + reactor.conversionUnit)
-                                    / ((double) reactor.convertedFuel + (double) reactor.reactorFuel)
-                                    * 100D,
-                            100D) + "%");
-            text.add(reactor.convertedFuel + " / " + (reactor.convertedFuel + reactor.reactorFuel)); // todo refine or
-                                                                                                     // remove
+            if (core.reactorFuel + core.convertedFuel > 0) {
+                text.add(
+                        Utills.round(
+                                ((double) core.convertedFuel + core.conversionUnit)
+                                        / ((double) core.convertedFuel + (double) core.reactorFuel)
+                                        * 100D,
+                                100D) + "%");
+            }
+            text.add(core.convertedFuel + " / " + (core.convertedFuel + core.reactorFuel));
             drawHoveringText(text, mouseX, mouseY, fontRendererObj);
         }
 
-        if (showStats) {
+        if (showStatistics) {
             if (GuiHelper.isInRect(53, 15, 140, 18, mouseX - guiLeft, mouseY - guiTop)) {
                 text.addAll(
                         fontRendererObj.listFormattedStringToWidth(
@@ -247,19 +243,18 @@ public class GUIReactor extends GUIBase {
         }
     }
 
-    private void drawStats() {
-
-        double inputRate = reactor.fieldDrain / (1D - (reactor.fieldCharge / reactor.maxFieldCharge));
+    private void drawStatistics() {
+        double inputRate = core.fieldDrain / (1D - (core.fieldCharge / core.maxFieldCharge));
         fontRendererObj.drawString(StatCollector.translateToLocal("gui.de.tempLoad.name"), 55, 16, 0x0000FF);
-        fontRendererObj.drawString(Utills.round(reactor.tempDrainFactor * 100D, 1D) + "%", 60, 2 + 24, 0);
+        fontRendererObj.drawString(Utills.round(core.tempDrainFactor * 100D, 1D) + "%", 60, 2 + 24, 0);
         fontRendererObj.drawString(StatCollector.translateToLocal("gui.de.mass.name"), 55, 16 + 24, 0x0000FF);
         fontRendererObj.drawString(
-                Utills.round((reactor.reactorFuel + reactor.convertedFuel) / 1296D, 100) + "m^3",
+                Utills.round((core.reactorFuel + core.convertedFuel) / 1296D, 100) + "m^3",
                 60,
                 2 + 2 * 24,
                 0);
         fontRendererObj.drawString(StatCollector.translateToLocal("gui.de.genRate.name"), 55, 16 + 2 * 24, 0x0000FF);
-        fontRendererObj.drawString(Utills.addCommas((int) reactor.generationRate) + "RF/t", 60, 2 + 3 * 24, 0);
+        fontRendererObj.drawString(Utills.addCommas((int) core.generationRate) + "RF/t", 60, 2 + 3 * 24, 0);
         fontRendererObj
                 .drawString(StatCollector.translateToLocal("gui.de.fieldInputRate.name"), 55, 16 + 3 * 24, 0x0000FF);
         fontRendererObj
@@ -267,38 +262,45 @@ public class GUIReactor extends GUIBase {
         fontRendererObj
                 .drawString(StatCollector.translateToLocal("gui.de.fuelConversion.name"), 55, 16 + 4 * 24, 0x0000FF);
         fontRendererObj.drawString(
-                Utills.addCommas((int) Math.round(reactor.fuelUseRate * 1000000D)) + "nb/t",
+                Utills.addCommas((int) Math.round(core.fuelUseRate * 1000000D)) + "nb/t",
                 60,
                 2 + 5 * 24,
                 0);
     }
 
+    private void drawStatus() {
+        String status = StatCollector.translateToLocal("gui.de.status.txt") + ": ";
+        switch (core.reactorState) {
+            case OFFLINE -> status += EnumChatFormatting.DARK_GRAY;
+            case STARTING, STOPPING -> status += EnumChatFormatting.RED;
+            case ONLINE -> status += EnumChatFormatting.DARK_GREEN;
+            case INVALID -> status += EnumChatFormatting.DARK_RED;
+        }
+        status += core.reactorState.toLocalizedString(core.canStart());
+        fontRendererObj.drawString(status, xSize - 5 - fontRendererObj.getStringWidth(status), 125, 0);
+    }
+
     @Override
     public void updateScreen() {
-
-        if (reactor.reactorState == TileReactorCore.STATE_INVALID
-                || reactor.reactorState == TileReactorCore.STATE_OFFLINE
-                || reactor.reactorState == TileReactorCore.STATE_STOP)
-            collection.getComponent("DEACTIVATE").setEnabled(false);
-        else collection.getComponent("DEACTIVATE").setEnabled(true);
-        if ((reactor.reactorState == TileReactorCore.STATE_OFFLINE
-                || (reactor.reactorState == TileReactorCore.STATE_STOP && !reactor.canStart())) && reactor.canCharge())
-            collection.getComponent("CHARGE").setEnabled(true);
-        else collection.getComponent("CHARGE").setEnabled(false);
-        if ((reactor.reactorState == TileReactorCore.STATE_START || reactor.reactorState == TileReactorCore.STATE_STOP)
-                && reactor.canStart())
-            collection.getComponent("ACTIVATE").setEnabled(true);
-        else collection.getComponent("ACTIVATE").setEnabled(false);
+        collection.getComponent("DEACTIVATE")
+                .setEnabled(core.reactorState == ReactorState.STARTING || core.reactorState == ReactorState.ONLINE);
+        collection.getComponent("CHARGE").setEnabled(
+                (core.reactorState == ReactorState.OFFLINE
+                        || (core.reactorState == ReactorState.STOPPING && !core.canStart())) && core.canCharge());
+        collection.getComponent("ACTIVATE").setEnabled(
+                (core.reactorState == ReactorState.STARTING || core.reactorState == ReactorState.STOPPING)
+                        && core.canStart());
         super.updateScreen();
     }
 
     @Override
     public void buttonClicked(int id, int button) {
         super.buttonClicked(id, button);
-        if (id < 3) container.sendObjectToServer(null, 20, id);
-        else if (id == 3) {
-            showStats = !showStats;
-            ((ComponentButton) collection.getComponent("STATS")).hoverText = showStats
+        if (id < 3) {
+            container.sendObjectToServer(null, 20, id);
+        } else if (id == 3) {
+            showStatistics = !showStatistics;
+            ((ComponentButton) collection.getComponent("STATS")).hoverText = showStatistics
                     ? StatCollector.translateToLocal("button.de.statsHide.txt")
                     : StatCollector.translateToLocal("button.de.statsShow.txt");
         }
