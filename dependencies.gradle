@@ -4,13 +4,13 @@ dependencies {
     api("com.github.GTNewHorizons:BrandonsCore:1.0.0.13-GTNH:dev")
     api("curse.maven:cofh-lib-220333:2388748")
 
-    compileOnly("com.github.GTNewHorizons:ForestryMC:4.6.7:api") {
+    compileOnly("com.github.GTNewHorizons:ForestryMC:4.6.14:api") {
         transitive = false
     }
-    compileOnly("com.github.GTNewHorizons:OpenComputers:1.9.5-GTNH:api") {
+    compileOnly("com.github.GTNewHorizons:OpenComputers:1.9.17-GTNH:api") {
         transitive = false
     }
-    compileOnly("com.github.GTNewHorizons:NotEnoughItems:2.3.53-GTNH:dev") {
+    compileOnly("com.github.GTNewHorizons:NotEnoughItems:2.4.5-GTNH:dev") {
         transitive = false
     }
     compileOnly("com.github.GTNewHorizons:CodeChickenLib:1.1.8:dev") {
