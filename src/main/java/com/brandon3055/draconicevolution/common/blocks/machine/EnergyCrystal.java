@@ -24,7 +24,12 @@ import com.brandon3055.draconicevolution.common.blocks.BlockDE;
 import com.brandon3055.draconicevolution.common.blocks.itemblocks.EnergyCrystalItemBlock;
 import com.brandon3055.draconicevolution.common.lib.References;
 import com.brandon3055.draconicevolution.common.lib.Strings;
-import com.brandon3055.draconicevolution.common.tileentities.energynet.*;
+import com.brandon3055.draconicevolution.common.tileentities.energynet.IRemoteEnergyHandler;
+import com.brandon3055.draconicevolution.common.tileentities.energynet.LinkedEnergyDevice;
+import com.brandon3055.draconicevolution.common.tileentities.energynet.TileEnergyRelay;
+import com.brandon3055.draconicevolution.common.tileentities.energynet.TileEnergyTransceiver;
+import com.brandon3055.draconicevolution.common.tileentities.energynet.TileRemoteEnergyBase;
+import com.brandon3055.draconicevolution.common.tileentities.energynet.TileWirelessEnergyTransceiver;
 import com.brandon3055.draconicevolution.common.utills.IHudDisplayBlock;
 
 import cpw.mods.fml.relauncher.Side;

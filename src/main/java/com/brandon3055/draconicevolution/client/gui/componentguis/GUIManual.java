@@ -1,6 +1,13 @@
 package com.brandon3055.draconicevolution.client.gui.componentguis;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,7 +25,12 @@ import org.apache.commons.io.IOUtils;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
-import com.brandon3055.brandonscore.client.gui.guicomponents.*;
+import com.brandon3055.brandonscore.client.gui.guicomponents.ComponentBase;
+import com.brandon3055.brandonscore.client.gui.guicomponents.ComponentButton;
+import com.brandon3055.brandonscore.client.gui.guicomponents.ComponentCollection;
+import com.brandon3055.brandonscore.client.gui.guicomponents.ComponentTextureButton;
+import com.brandon3055.brandonscore.client.gui.guicomponents.ComponentTexturedRect;
+import com.brandon3055.brandonscore.client.gui.guicomponents.GUIScrollingBase;
 import com.brandon3055.brandonscore.client.utills.ClientUtills;
 import com.brandon3055.brandonscore.common.utills.InfoHelper;
 import com.brandon3055.draconicevolution.client.gui.guicomponents.ComponentContributorsPage;

@@ -1,6 +1,6 @@
 package com.brandon3055.draconicevolution.client.render.tile;
 
-import java.awt.*;
+import java.awt.Point;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;

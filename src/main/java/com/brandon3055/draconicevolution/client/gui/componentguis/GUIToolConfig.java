@@ -11,7 +11,13 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.StatCollector;
 import net.minecraft.util.StringUtils;
 
-import com.brandon3055.brandonscore.client.gui.guicomponents.*;
+import com.brandon3055.brandonscore.client.gui.guicomponents.ComponentBase;
+import com.brandon3055.brandonscore.client.gui.guicomponents.ComponentButton;
+import com.brandon3055.brandonscore.client.gui.guicomponents.ComponentCollection;
+import com.brandon3055.brandonscore.client.gui.guicomponents.ComponentItemRenderer;
+import com.brandon3055.brandonscore.client.gui.guicomponents.ComponentTextField;
+import com.brandon3055.brandonscore.client.gui.guicomponents.ComponentTexturedRect;
+import com.brandon3055.brandonscore.client.gui.guicomponents.GUIBase;
 import com.brandon3055.brandonscore.common.utills.ItemNBTHelper;
 import com.brandon3055.brandonscore.common.utills.Utills;
 import com.brandon3055.draconicevolution.DraconicEvolution;

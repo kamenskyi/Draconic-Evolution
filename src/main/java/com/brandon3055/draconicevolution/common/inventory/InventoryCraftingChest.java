@@ -1,7 +1,8 @@
 package com.brandon3055.draconicevolution.common.inventory;
 
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.inventory.*;
+import net.minecraft.inventory.Container;
+import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.item.ItemStack;
 
 import com.brandon3055.draconicevolution.common.tileentities.TileDraconiumChest;
