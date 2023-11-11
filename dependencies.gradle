@@ -7,16 +7,16 @@ dependencies {
     compileOnly("com.github.GTNewHorizons:ForestryMC:4.6.14:api") {
         transitive = false
     }
-    compileOnly("com.github.GTNewHorizons:OpenComputers:1.9.17-GTNH:api") {
+    compileOnly("com.github.GTNewHorizons:OpenComputers:1.9.19-GTNH:api") {
         transitive = false
     }
-    compileOnly("com.github.GTNewHorizons:NotEnoughItems:2.4.5-GTNH:dev") {
+    compileOnly("com.github.GTNewHorizons:NotEnoughItems:2.4.12-GTNH:dev") {
         transitive = false
     }
     compileOnly("com.github.GTNewHorizons:CodeChickenLib:1.1.8:dev") {
         transitive = false
     }
-    compileOnly("com.github.GTNewHorizons:inventory-tweaks:1.5.16:dev") {
+    compileOnly("com.github.GTNewHorizons:inventory-tweaks:1.6.0:dev") {
         transitive = false
     }
 
