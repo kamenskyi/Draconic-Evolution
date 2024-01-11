@@ -1,19 +1,19 @@
 // Add your dependencies here
 
 dependencies {
-    api("com.github.GTNewHorizons:BrandonsCore:1.0.0.13-GTNH:dev")
+    api("com.github.GTNewHorizons:BrandonsCore:1.1.0-GTNH:dev")
     api("curse.maven:cofh-lib-220333:2388748")
 
-    compileOnly("com.github.GTNewHorizons:ForestryMC:4.7.1:api") {
+    compileOnly("com.github.GTNewHorizons:ForestryMC:4.8.2:api") {
         transitive = false
     }
-    compileOnly("com.github.GTNewHorizons:OpenComputers:1.9.21-GTNH:api") {
+    compileOnly("com.github.GTNewHorizons:OpenComputers:1.10.6-GTNH:api") {
         transitive = false
     }
-    compileOnly("com.github.GTNewHorizons:NotEnoughItems:2.4.13-GTNH:dev") {
+    compileOnly("com.github.GTNewHorizons:NotEnoughItems:2.5.4-GTNH:dev") {
         transitive = false
     }
-    compileOnly("com.github.GTNewHorizons:CodeChickenLib:1.1.10:dev") {
+    compileOnly("com.github.GTNewHorizons:CodeChickenLib:1.2.1:dev") {
         transitive = false
     }
     compileOnly("com.github.GTNewHorizons:inventory-tweaks:1.6.1:dev") {
