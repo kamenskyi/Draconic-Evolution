@@ -16,7 +16,7 @@ dependencies {
     compileOnly("com.github.GTNewHorizons:CodeChickenLib:1.2.1:dev") {
         transitive = false
     }
-    compileOnly("com.github.GTNewHorizons:inventory-tweaks:1.6.1:dev") {
+    compileOnly("com.github.GTNewHorizons:inventory-tweaks:1.6.2:dev") {
         transitive = false
     }
 
